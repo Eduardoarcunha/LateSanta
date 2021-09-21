@@ -2,8 +2,9 @@
 import pygame
 import os
 import random
+from abc import ABC, abstractmethod
 from assets import SNOWBALL_IMG, COOKIE_IMG, THROW_SOUND, SNOW_SOUND, SANTAHAT_GAME
-from config import WIDTH, HEIGHT, GRAVITY, WALKING
+from config import WIDTH, HEIGHT, GRAVITY, WALKING, SPAWN
 
 """
 
@@ -15,7 +16,7 @@ https://coderslegacy.com/python/pygame-scrolling-background/
 class Background:
     def __init__(self):
 
-        #Imagem background jogo
+        #Imagem background jogo 
         self.image = pygame.image.load(os.path.join('Assets','Images','BG_02.png')).convert_alpha() # abre a imagem de fundo
 
     
@@ -129,20 +130,16 @@ class Santa(pygame.sprite.Sprite):
         # Controle de ticks de animação: troca de imagem a cada self.frame_ticks milissegundos.
         self.frame_ticks = 100
 
-    # Metodo que atualiza a posição do personagem
-    def update(self):
-
-        #Atualização da posição
-        self.rect.x += self.speedx
-        self.rect.y += self.speedy
-
+    #Função que verifica e garante que o Santa se mantenha na tela
+    def verify_position(self):
         if self.rect.right > WIDTH:
             self.rect.right = WIDTH
 
         if self.rect.left < 0:
             self.rect.left = 0
 
-        # Gravidade puxando o santa para o chão
+    #Função que puxa o Santa para o chão
+    def gravity(self):
         if self.rect.centery < 600:
             self.speedy += GRAVITY
 
@@ -150,16 +147,9 @@ class Santa(pygame.sprite.Sprite):
             self.speedy = 0
             self.rect.centery = 600
 
-        # Verifica o tick atual.
-        now = pygame.time.get_ticks()
-
-        # Verifica quantos ticks se passaram desde a ultima mudança de frame.
-        elapsed_ticks = now - self.last_update
-
-        # Se já está na hora de mudar de imagem...
-        if elapsed_ticks > self.frame_ticks:
-
-            # Marca o tick da nova imagem.
+    #Função de animação
+    def change_animation(self, now):
+        # Marca o tick da nova imagem.
             self.last_update = now
 
             # Avança um quadro.
@@ -182,6 +172,30 @@ class Santa(pygame.sprite.Sprite):
             self.rect = self.image.get_rect()
             self.rect.center = center
 
+    # Metodo que atualiza a posição do personagem
+    def update(self):
+
+        #Atualização da posição
+        self.rect.x += self.speedx
+        self.rect.y += self.speedy
+
+
+        self.verify_position()
+
+        #Atualiza a posição em y, fazendo com que o santa volte para o chao depois de um pulo
+        self.gravity()
+
+        # Verifica o tick atual.
+        now = pygame.time.get_ticks()
+
+        # Verifica quantos ticks se passaram desde a ultima mudança de frame.
+        elapsed_ticks = now - self.last_update
+
+        # Se já está na hora de mudar de imagem...
+        if elapsed_ticks > self.frame_ticks:
+            self.change_animation(now)
+
+
     # Método de arremesso do gorro
     def throw(self):
         # Verifica se pode lançar
@@ -202,18 +216,31 @@ class Santa(pygame.sprite.Sprite):
             self.groups['all_hats'].add(new_hat)
             self.assets[THROW_SOUND].play()
 
-class Hat(pygame.sprite.Sprite):
 
+class Element(ABC, pygame.sprite.Sprite):
     # Construtor da classe.
-    def __init__(self, assets, centerx, centery):
-
+    def __init__(self, assets):
+        
         # Construtor da classe mãe (Sprite).
         pygame.sprite.Sprite.__init__(self)
 
         #Imagem do gorro
-        self.image = assets[SANTAHAT_GAME]
+        self.image = assets
         self.mask = pygame.mask.from_surface(self.image)
         self.rect = self.image.get_rect()
+        self.speedy = 0
+
+    @abstractmethod
+    def update(self):
+        self.rect.x += self.speedx
+            
+
+class Hat(Element):
+
+    # Construtor da classe.
+    def __init__(self, assets, centerx, centery):
+        # Construtor da classe mãe Element
+        super().__init__(assets[SANTAHAT_GAME])
 
         # Coloca no lugar inicial definido em x, y do constutor
         self.rect.centerx = centerx
@@ -222,61 +249,53 @@ class Hat(pygame.sprite.Sprite):
 
     def update(self):
 
-        # O gorro só se move no eixo x
-        self.rect.x += self.speedx
+        super().update()
 
         # Se o lançamento passar do inicio da tela, morre.
         if self.rect.centerx > WIDTH:
             self.kill()
 
 
+
 #Classe das bolas de neve
-class Snowball(pygame.sprite.Sprite):
+class Snowball(Element):
 
     def __init__(self,assets):
 
-        # Construtor da classe mãe (Sprite).
-        pygame.sprite.Sprite.__init__(self)
+        # Construtor da classe mãe Element
+        super().__init__(assets[SNOWBALL_IMG])
 
-        #Imagem da bola, suas posições e a definindo como "mascara" para melhorar as colisões
-        self.image = assets[SNOWBALL_IMG]
-        self.mask = pygame.mask.from_surface(self.image)
-        self.rect = self.image.get_rect()
-        self.rect.centerx = random.randint(WIDTH, WIDTH + 1500)
+        self.rect.centerx = random.randint(WIDTH, SPAWN)
         self.rect.centery = 600
         self.speedx = random.randint(-12, -5)
-        self.speedy = 0
+        
 
     def update(self):
-        # Atualizando a posição da bola de neve
-        self.rect.x += self.speedx
+        #Chama o metodo da classe mãe
+        super().update()
 
         if self.rect.centerx <= 0:
-            self.rect.centerx = random.randint(WIDTH, WIDTH + 1500)
+            self.rect.centerx = random.randint(WIDTH, SPAWN)
 
 #Classe dos cookies
-class Cookie(pygame.sprite.Sprite):
+class Cookie(Element):
 
     def __init__(self,assets):
 
-        # Construtor da classe mãe (Sprite).
-        pygame.sprite.Sprite.__init__(self)
+        # Construtor da classe mãe Element
+        super().__init__(assets[COOKIE_IMG])
 
-        # Imagem do cookie, suas posições e a definindo como "mascara" para melhorar as colisões
-        self.image = assets[COOKIE_IMG]
-        self.mask = pygame.mask.from_surface(self.image)
-        self.rect = self.image.get_rect()
-        self.rect.centerx = random.randint(WIDTH, WIDTH + 1500)
+        self.rect.centerx = random.randint(WIDTH, SPAWN)
         self.rect.centery = random.randint(430, 550)
         self.speedx = random.randint(-7,-5)
-        self.speedy = 0
+
 
     def update(self):
 
-        # Atualizando a posição do cookie
-        self.rect.x += self.speedx
-
+        #Chama o metodo da classe mãe
+        super().update()
+        
         if self.rect.centerx <= 0:
-            self.rect.centerx = random.randint(WIDTH, WIDTH + 1500)
+            self.rect.centerx = random.randint(WIDTH, SPAWN)
             self.rect.centery = random.randint(430, 550)
             self.speedx = random.randint(-7,-5)

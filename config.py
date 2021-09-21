@@ -2,6 +2,9 @@
 WIDTH = 1100
 HEIGHT = 760
 
+#SPAWN MAXIMO
+SPAWN = WIDTH + 1500
+
 #Estados possíveis sprite jogador
 WALKING = 0
 
